@@ -4,7 +4,7 @@ import { writeFileSync } from "fs"
 
 const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) => {
   try {
-    const vaultTypes = process.env.REACT_APP_NETWORK === 'mainnet' ? ['ETH-A'] : ['ETH-A', 'FAU-A'];
+    const vaultTypes = ['ETH-A']
     const vaultTypesResultMap = vaultTypes.map(async (vaultType) => {
       const collateralTypeVaultCount = await subgraphClient.request(gql`{
         collateralType(id: "${vaultType}") {
@@ -73,8 +73,9 @@ const main = async () => {
 
     const blockMin = 8928198
     // get current block
-    const blockMax = 10000000
-    const blockDataPointCount = 10
+    const blockMax = 16267142
+    const blockDataPointCount = 5
+    // const blockDataPointCount = 1000
     const blockDiff = Math.floor((blockMax - blockMin) / blockDataPointCount)
 
     let allVaultsByBlock: { [key: number]: any } = {}

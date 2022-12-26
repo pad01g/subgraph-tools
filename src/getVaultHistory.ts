@@ -1,6 +1,6 @@
 import { GraphQLClient, gql } from 'graphql-request'
 require("dotenv").config();
-import { writeFileSync, readFileSync } from "fs"
+import { writeFileSync } from "fs"
 
 const getSingleVault = async (subgraphClient: GraphQLClient, cdpIdStr: string) => {
     let fetchResult;
@@ -257,75 +257,9 @@ const getSingleVault = async (subgraphClient: GraphQLClient, cdpIdStr: string) =
                 const logUpdatedDebtChange = updateDebtChange(logUpdatedCollateralChange, mapIndex);
                 return logUpdatedDebtChange;
             });
-            // get list of time points where price values will be fetched
-            const getUnsortedPriceTimestampList = (logs: any) => {
-                const priceTimestampList = logs.map((log: any) => log.timestamp);
-                if (new Set(priceTimestampList).size < 2) {
-                    priceTimestampList.push(((Date.now() / 1000) | 0).toString());
-                }
-                const firstTimestamp = +priceTimestampList[0];
-                const lastTimestamp = +priceTimestampList[priceTimestampList.length - 1];
-                const numberOfPoints = 100;
-                const pointDiff = +(lastTimestamp - firstTimestamp) / numberOfPoints;
-                const middlePoints = [...Array(numberOfPoints).keys()].map((_v, index) =>
-                    ((firstTimestamp + index * pointDiff) | 0).toString(),
-                );
-                return priceTimestampList.concat(middlePoints);
-            };
-            const priceTimestampList = getUnsortedPriceTimestampList(modifiedLogs);
-            // get oracle price log
-            const priceListGql = priceTimestampList.map((timestamp: any, index: number) => {
-                return `
-            _${index}: collateralPriceUpdateLogs(first: 1, orderBy: timestamp, orderDirection: desc, where: {timestamp_lte: ${timestamp}, collateral: "${collateralType.id}"}){
-              id,
-              newValue,
-              newSpotPrice,
-              block,
-              timestamp,
-              transaction,
-            }
-          `;
-            });
-            const unsortedPriceList = await subgraphClient.request(gql`{ ${priceListGql} }`);
 
             // update all log records for view
-            for (let logIndex = 0; logIndex < vaultWithAuctionLogs.length; logIndex++) {
-                // oracle price
-                if (
-                    unsortedPriceList &&
-                    unsortedPriceList[`_${logIndex}`] &&
-                    unsortedPriceList[`_${logIndex}`][0] &&
-                    unsortedPriceList[`_${logIndex}`][0].newValue
-                ) {
-                    vaultWithAuctionLogs[logIndex].oraclePrice = unsortedPriceList[`_${logIndex}`][0].newValue;
-                } else if (
-                    vaultWithAuctionLogs[logIndex - 1] &&
-                    vaultWithAuctionLogs[logIndex - 1].oraclePrice &&
-                    vaultWithAuctionLogs[logIndex - 1].oraclePrice
-                ) {
-                    vaultWithAuctionLogs[logIndex].oraclePrice = vaultWithAuctionLogs[logIndex - 1].oraclePrice;
-                } else {
-                    vaultWithAuctionLogs[logIndex].oraclePrice = 0;
-                }
-                const oraclePrice = vaultWithAuctionLogs[logIndex].oraclePrice;
-
-                // spot price
-                if (
-                    unsortedPriceList &&
-                    unsortedPriceList[`_${logIndex}`] &&
-                    unsortedPriceList[`_${logIndex}`][0] &&
-                    unsortedPriceList[`_${logIndex}`][0].newSpotPrice
-                ) {
-                    vaultWithAuctionLogs[logIndex].spotPrice = unsortedPriceList[`_${logIndex}`][0].newSpotPrice;
-                } else if (
-                    vaultWithAuctionLogs[logIndex - 1] &&
-                    vaultWithAuctionLogs[logIndex - 1].spotPrice &&
-                    vaultWithAuctionLogs[logIndex - 1].spotPrice
-                ) {
-                    vaultWithAuctionLogs[logIndex].spotPrice = vaultWithAuctionLogs[logIndex - 1].spotPrice;
-                } else {
-                    vaultWithAuctionLogs[logIndex].spotPrice = 0;
-                }
+            for (let logIndex = 0; logIndex < modifiedLogs.length; logIndex++) {
 
                 // update all the log records so that they all have price/diff/before/after value.
                 if (logIndex === 0) {
@@ -375,36 +309,11 @@ const getSingleVault = async (subgraphClient: GraphQLClient, cdpIdStr: string) =
                             }
                         }
                     }
-
-                    // Pre Collateralization Ratio
-                    if (parseFloat(vaultWithAuctionLogs[logIndex].debtBefore)) {
-                        vaultWithAuctionLogs[logIndex].preCollateralizationRatio =
-                            (oraclePrice * parseFloat(vaultWithAuctionLogs[logIndex].collateralBefore)) /
-                            (parseFloat(vaultWithAuctionLogs[logIndex].debtBefore) * parseFloat(collateralType.rate));
-                    } else {
-                        vaultWithAuctionLogs[logIndex].preCollateralizationRatio = 0;
-                    }
-                    // Post Collateralization Ratio
-                    if (parseFloat(vaultWithAuctionLogs[logIndex].debtAfter)) {
-                        vaultWithAuctionLogs[logIndex].postCollateralizationRatio =
-                            (oraclePrice * parseFloat(vaultWithAuctionLogs[logIndex].collateralAfter)) /
-                            (parseFloat(vaultWithAuctionLogs[logIndex].debtAfter) * parseFloat(collateralType.rate));
-                    } else {
-                        vaultWithAuctionLogs[logIndex].postCollateralizationRatio = 0;
-                    }
                 }
             }
 
             // reverse it again to view as from new to old
-            fetchResult.vaults[0].logs = vaultWithAuctionLogs.reverse().map((log: any) => Object.assign({}, log));
-
-            // add price list
-            const priceListDeepElement = Object.keys(unsortedPriceList ?? {})
-                .map((key) => unsortedPriceList[key][0])
-                .filter((v) => v);
-            fetchResult.priceList = [...new Map(priceListDeepElement.map((item) => [item.timestamp, item])).values()].sort(
-                (left, right) => +left.timestamp - +right.timestamp,
-            );
+            fetchResult.vaults[0].logs = modifiedLogs.reverse().map((log: any) => Object.assign({}, log));
         }
     }
     return fetchResult;
@@ -418,9 +327,10 @@ const main = async () => {
         let cdpIdList = ["0x0105049810a15d3fc0636d9bc85d14a707515e75-ETH-A"];
 
         let allVaultsById: { [key: string]: any } = {}
-        for (const cdpIdStr of cdpIdList) {
-            const singleVault = await getSingleVault(graphQLClient, cdpIdStr)
-            allVaultsById[cdpIdStr] = singleVault
+        for (const { index, value } of cdpIdList.map((value, index) => ({ index, value }))) {
+            const singleVault = await getSingleVault(graphQLClient, value)
+            allVaultsById[value] = singleVault
+            console.log(`index: ${index}, value: ${value}, logs.length: ${singleVault.vaults[0].logs.length}`)
         }
         writeFileSync(`./data/vaultHistory.json`, JSON.stringify(allVaultsById, null, 2))
     }
