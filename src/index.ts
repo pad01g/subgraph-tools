@@ -1,7 +1,8 @@
 import { GraphQLClient, gql } from 'graphql-request'
 require("dotenv").config();
+import { writeFileSync } from "fs"
 
-const getAllVaults = async (subgraphClient: GraphQLClient) => {
+const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) => {
   try {
     const vaultTypes = process.env.REACT_APP_NETWORK === 'mainnet' ? ['ETH-A'] : ['ETH-A', 'FAU-A'];
     const vaultTypesResultMap = vaultTypes.map(async (vaultType) => {
@@ -31,7 +32,7 @@ const getAllVaults = async (subgraphClient: GraphQLClient) => {
       let resultArray: any[] = [];
       while (maxId && vaultCount > resultArray.length) {
         const vaultsSubgraphClientResult = await subgraphClient.request(gql`{
-          vaults(where: { collateralType: "${vaultType}", id_gt: "${currentId}", collateral_not: 0, debt_not: 0 }, first: 1000, orderBy: id, orderDirection: asc){
+          vaults(where: { collateralType: "${vaultType}", id_gt: "${currentId}" }, first: 1000, orderBy: id, orderDirection: asc, block: {number: ${blockNumber}}){
             id,
             collateral,
             debt,
@@ -69,10 +70,20 @@ const main = async () => {
   const endpoint = process.env.API_ENDPOINT
   if (endpoint) {
     const graphQLClient = new GraphQLClient(endpoint, { mode: 'cors' })
-    const allVaults = await getAllVaults(graphQLClient)
-    if (allVaults) {
-      console.log("allVaults", JSON.stringify(allVaults["ETH-A"].length, null, 2))
+
+    const blockMin = 8928198
+    // get current block
+    const blockMax = 10000000
+    const blockDataPointCount = 10
+    const blockDiff = Math.floor((blockMax - blockMin) / blockDataPointCount)
+
+    let allVaultsByBlock: { [key: number]: any } = {}
+    for (let blockDataPoint = blockMin; blockDataPoint < blockMax; blockDataPoint += blockDiff) {
+      const allVaults = await getAllVaults(graphQLClient, blockDataPoint)
+      allVaultsByBlock[blockDataPoint] = allVaults
+      console.log(`blockDataPoint: ${blockDataPoint}, allVaults.length: ${(allVaults ? allVaults["ETH-A"].length : undefined)}, count: ${Math.floor((blockDataPoint - blockMin) / blockDiff)} `)
     }
+    writeFileSync(`./data/allVaultsByBlock-max-${blockMax}-split-${blockDataPointCount}.json`, JSON.stringify(allVaultsByBlock, null, 2))
   }
 }
 
