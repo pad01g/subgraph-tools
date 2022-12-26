@@ -1,7 +1,8 @@
 import { GraphQLClient, gql } from 'graphql-request'
 require("dotenv").config();
-import { writeFileSync } from "fs"
+import { writeFileSync, readFileSync } from "fs"
 
+// get tx log and property of specific vault
 const getSingleVault = async (subgraphClient: GraphQLClient, cdpIdStr: string) => {
     let fetchResult;
     // get vault information and logs specified by search condition.
@@ -324,7 +325,10 @@ const main = async () => {
     if (endpoint) {
         const graphQLClient = new GraphQLClient(endpoint, { mode: 'cors' })
 
-        let cdpIdList = ["0x0105049810a15d3fc0636d9bc85d14a707515e75-ETH-A"];
+        const allVaultIdFilePath = `./data/allVaultId.json`
+        const allVaultId = readFileSync(allVaultIdFilePath).toString("utf8");
+        const cdpIdList: string[] = JSON.parse(allVaultId).map((v: any) => v.id)
+        // const cdpIdList = ["0x0105049810a15d3fc0636d9bc85d14a707515e75-ETH-A"];
 
         let allVaultsById: { [key: string]: any } = {}
         for (const { index, value } of cdpIdList.map((value, index) => ({ index, value }))) {

@@ -2,6 +2,7 @@ import { GraphQLClient, gql } from 'graphql-request'
 require("dotenv").config();
 import { writeFileSync } from "fs"
 
+// just get all vault ids
 const getAllVaults = async (subgraphClient: GraphQLClient) => {
   try {
     let currentId = 0;

@@ -1,7 +1,8 @@
 import { GraphQLClient, gql } from 'graphql-request'
 require("dotenv").config();
-import { writeFileSync } from "fs"
+import { writeFileSync, mkdirSync } from "fs"
 
+// get all vaults with safety level parameter at some block number
 const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) => {
   try {
     const vaultTypes = ['ETH-A']
@@ -74,17 +75,16 @@ const main = async () => {
     const blockMin = 8928198
     // get current block
     const blockMax = 16267142
-    const blockDataPointCount = 5
-    // const blockDataPointCount = 1000
+    // const blockDataPointCount = 5
+    const blockDataPointCount = 1000
     const blockDiff = Math.floor((blockMax - blockMin) / blockDataPointCount)
 
-    let allVaultsByBlock: { [key: number]: any } = {}
     for (let blockDataPoint = blockMin; blockDataPoint < blockMax; blockDataPoint += blockDiff) {
       const allVaults = await getAllVaults(graphQLClient, blockDataPoint)
-      allVaultsByBlock[blockDataPoint] = allVaults
       console.log(`blockDataPoint: ${blockDataPoint}, allVaults.length: ${(allVaults ? allVaults["ETH-A"].length : undefined)}, count: ${Math.floor((blockDataPoint - blockMin) / blockDiff)} `)
+      mkdirSync(`./data/${blockDataPoint}/`)
+      writeFileSync(`./data/${blockDataPoint}/allVaultsByBlock-max-${blockMax}-split-${blockDataPointCount}.json`, JSON.stringify(blockDataPoint, null, 2))
     }
-    writeFileSync(`./data/allVaultsByBlock-max-${blockMax}-split-${blockDataPointCount}.json`, JSON.stringify(allVaultsByBlock, null, 2))
   }
 }
 

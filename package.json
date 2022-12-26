@@ -13,7 +13,7 @@
     "typescript": "^4.9.4"
   },
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "getVaultSetHistory": "ts-node src/getVaultSetHistory.ts",
     "getVaultHistory": "ts-node src/getVaultHistory.ts",
     "getAllVaultId": "ts-node src/getAllVaultId.ts"
   }
