@@ -14,9 +14,13 @@ const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) 
         vaults(where: { collateralType: "${vaultType}", collateral_not: 0, debt_not: 0 }, first: 1, orderBy: id, orderDirection: desc){
           id
         }
+        systemStates(block: {number: ${blockNumber}}, first: 1){
+          timestamp
+        }
       }`);
       let vaultCount = 0;
       let maxId = 0;
+      let timestamp = 0;
       Object.entries(collateralTypeVaultCount).forEach((responseObject) => {
         const key: string = responseObject[0]
         const value: any = responseObject[1]
@@ -25,6 +29,8 @@ const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) 
             vaultCount = value.vaultCount;
           } else if (key === 'vaults') {
             maxId = value[0] ? value[0].id : 0;
+          } else if (key === "systemStates") {
+            timestamp = value[0] ? value[0].timestamp : 0;
           }
         }
       });
@@ -52,12 +58,12 @@ const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) 
           break;
         }
       }
-      return resultArray;
+      return { timestamp, resultArray };
     });
     let object: { [key: string]: any } = {};
-    (await Promise.all(vaultTypesResultMap)).map((array, index) => {
+    (await Promise.all(vaultTypesResultMap)).map((obj, index) => {
       const key = vaultTypes[index];
-      object[key] = array;
+      object[key] = obj;
     });
     return object;
   } catch (err) {
@@ -81,9 +87,9 @@ const main = async () => {
 
     for (let blockDataPoint = blockMin; blockDataPoint < blockMax; blockDataPoint += blockDiff) {
       const allVaults = await getAllVaults(graphQLClient, blockDataPoint)
-      console.log(`blockDataPoint: ${blockDataPoint}, allVaults.length: ${(allVaults ? allVaults["ETH-A"].length : undefined)}, count: ${Math.floor((blockDataPoint - blockMin) / blockDiff)} `)
-      mkdirSync(`./data/${blockDataPoint}/`)
-      writeFileSync(`./data/${blockDataPoint}/allVaultsByBlock-max-${blockMax}-split-${blockDataPointCount}.json`, JSON.stringify(blockDataPoint, null, 2))
+      console.log(`blockDataPoint: ${blockDataPoint},  allVaults["ETH-A"].timestamp: ${allVaults ? allVaults["ETH-A"].timestamp : undefined}, allVaults["ETH-A"].resultArray.length: ${(allVaults ? allVaults["ETH-A"].resultArray.length : undefined)}, count: ${Math.floor((blockDataPoint - blockMin) / blockDiff)} `)
+      mkdirSync(`./data/vaultSet/${blockDataPoint}/`)
+      writeFileSync(`./data/vaultSet/${blockDataPoint}/allVaultsByBlock-max-${blockMax}-split-${blockDataPointCount}.json`, JSON.stringify(allVaults, null, 2))
     }
   }
 }
