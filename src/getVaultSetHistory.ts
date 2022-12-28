@@ -8,10 +8,10 @@ const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) 
     const vaultTypes = ['ETH-A']
     const vaultTypesResultMap = vaultTypes.map(async (vaultType) => {
       const collateralTypeVaultCount = await subgraphClient.request(gql`{
-        collateralType(id: "${vaultType}") {
+        collateralType(id: "${vaultType}", block: {number: ${blockNumber}}) {
           vaultCount
         }
-        vaults(where: { collateralType: "${vaultType}", collateral_not: 0, debt_not: 0 }, first: 1, orderBy: id, orderDirection: desc){
+        vaults(where: { collateralType: "${vaultType}", collateral_not: 0, debt_not: 0 }, first: 1, orderBy: id, orderDirection: desc, block: {number: ${blockNumber}}){
           id
         }
         systemStates(block: {number: ${blockNumber}}, first: 1){
@@ -38,6 +38,7 @@ const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) 
       let currentId = 0;
       let resultArray: any[] = [];
       while (maxId && vaultCount > resultArray.length) {
+        console.log(`resultArray.length: ${resultArray.length}, maxId: ${maxId}, currentId: ${currentId}, vaultCount: ${vaultCount}`)
         const vaultsSubgraphClientResult = await subgraphClient.request(gql`{
           vaults(where: { collateralType: "${vaultType}", id_gt: "${currentId}" }, first: 1000, orderBy: id, orderDirection: asc, block: {number: ${blockNumber}}){
             id,
@@ -52,13 +53,21 @@ const getAllVaults = async (subgraphClient: GraphQLClient, blockNumber: number) 
           }
         }`);
         const vaultsIds = vaultsSubgraphClientResult.vaults.map((v: any) => v.id).sort();
-        currentId = vaultsIds[vaultsIds.length - 1];
-        resultArray = [...resultArray, ...vaultsSubgraphClientResult.vaults];
-        if (!vaultsSubgraphClientResult.vaults.length) {
+        if (!vaultsIds.length) {
           break;
         }
+        currentId = vaultsIds[vaultsIds.length - 1];
+        resultArray = [...resultArray, ...vaultsSubgraphClientResult.vaults];
       }
-      return { timestamp, resultArray };
+      const uniqueArray: any[] = []
+      const uniqueIndexList: string[] = []
+      resultArray.map(vault => {
+        if (uniqueIndexList.includes(vault.id)) {
+          uniqueArray.push(vault)
+          uniqueIndexList.push(vault.id)
+        }
+      })
+      return { timestamp, resultArray: uniqueArray };
     });
     let object: { [key: string]: any } = {};
     (await Promise.all(vaultTypesResultMap)).map((obj, index) => {
@@ -78,11 +87,12 @@ const main = async () => {
   if (endpoint) {
     const graphQLClient = new GraphQLClient(endpoint, { mode: 'cors' })
 
-    const blockMin = 8928198
+    // const blockMin = 8928198
+    const blockMin = 15412270 // 7338 + 14783922
     // get current block
     const blockMax = 16267142
     // const blockDataPointCount = 5
-    const blockDataPointCount = 1000
+    const blockDataPointCount = 10
     const blockDiff = Math.floor((blockMax - blockMin) / blockDataPointCount)
 
     for (let blockDataPoint = blockMin; blockDataPoint < blockMax; blockDataPoint += blockDiff) {
