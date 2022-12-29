@@ -27,5 +27,5 @@ yarn getAllVaultId
  - run `yarn getVaultHistory` to fetch all vault operation logs of today
  - run `yarn getVaultSetHistory` to fetch all vault set at some block in the past
  - run `yarn convertJsonToCsv` to convert all fetched raw json data to useful data for analysis
- 
+   - don't run this command because it's too slow, please use faster alternatives :/
  

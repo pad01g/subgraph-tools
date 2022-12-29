@@ -16,6 +16,6 @@
     "getVaultSetHistory": "ts-node src/getVaultSetHistory.ts",
     "getVaultHistory": "ts-node src/getVaultHistory.ts",
     "getAllVaultId": "ts-node src/getAllVaultId.ts",
-    "convertJsonToCsv": "NODE_OPTIONS=--max-old-space-size=4096 ts-node src/convertJsonToCsv.ts"
+    "convertJsonToCsv": "NODE_OPTIONS=--max-old-space-size=6000 ts-node src/convertJsonToCsv.ts"
   }
 }
